@@ -39,7 +39,16 @@ void loop(){
   lcd.print((char)223);
   lcd.print("F");
 
-  if(tempF > 71.0 && tempF < 72.9){
+  if(tempF > 65 && tempF < 70.9){
+    //turn fan on
+    startfanRunningTimer();
+    setSpeed(1);
+    setCompressor(0);
+    lcd.setCursor(0,1);
+    lcd.print("Speed: ");
+    lcd.print("1 - No AC");
+
+  }else if(tempF > 71.0 && tempF < 72.9){
     //turn fan on
     startfanRunningTimer();
     setSpeed(1);
@@ -75,7 +84,7 @@ void loop(){
 }
 void startfanRunningTimer(){
   if(!fanRunningTimer.remaining() == 0.0){
-    fanRunningTimer.start(15000);
+    fanRunningTimer.start(30000);
   }
 }
 void setCompressor(int val){
@@ -94,7 +103,7 @@ void setCompressor(int val){
 }
 void setSpeed(int speed){
   if(speed == 0){
-      if(fanRunningTimer.remaining() == 0.0){
+      if(fanRunningTimer.remaining() == 0.0 && digitalRead(A0) == LOW){
         fanTimer.restart();
         digitalWrite(A1, LOW);
         digitalWrite(A2, LOW);
