@@ -1,20 +1,29 @@
 #include <LiquidCrystal.h>
 #include <DHT11.h>
 #include <millisDelay.h>
+#include "FanMode.h"
+#include "CompressorMode.h"
+#include "FanController.h"
+#include "FanSpeeds.h"
+#include "ControlButtons.h"
+
 
 // Create an instance of the DHT11 class and set the digital I/O pin.
 DHT11 dht11(7);
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
-millisDelay compressorStartDelay;
-millisDelay compressorRunDelay;
-millisDelay fanTimer;
-millisDelay fanRunningTimer;
+
+int desiredTemp = 69.0;
+float tempF;
+FanMode fanMode = Auto;
+
+FanController  fanController = FanController();
+FanSpeeds fanSpeeds = FanSpeeds(&fanController, &lcd);
+ControlButtons controlButtons = ControlButtons();
 
 void setup(){
   lcd.begin(16, 2);
-  
   //compressor
   pinMode(A0, OUTPUT);
   digitalWrite(A0, LOW);
@@ -27,105 +36,47 @@ void setup(){
   //high speed
   pinMode(A3, OUTPUT);
   digitalWrite(A3, LOW);
-  fanTimer.start(5000);
+
+  //fan speed button
+  pinMode(8, INPUT);
+  
 }
 
 void loop(){
   float temperature = dht11.readTemperature();
-  float tempF = (temperature *9/5) + 32;
+  fanSpeeds.tempF = (temperature *9/5) + 32;
   lcd.setCursor(0,0); 
   lcd.print("Temp: ");
-  lcd.print(tempF);
+  lcd.print(fanSpeeds.tempF);
   lcd.print((char)223);
   lcd.print("F");
+  lcd.print(" ");
+  lcd.print(fanSpeeds.desiredTemp);
+  
+  int modeBtn = digitalRead(8);
+  if(modeBtn == HIGH){
+    fanMode = controlButtons.IncrementMode(fanMode);
+  }
+  int tempUp = digitalRead(9);
+  if(tempUp == HIGH){
+    fanSpeeds.desiredTemp++;
+  }
+  int tempDown = digitalRead(10);
+  if(tempDown == HIGH){
+    fanSpeeds.desiredTemp--;
+  }
 
-  if(tempF > 65 && tempF < 70.9){
-    //turn fan on
-    startfanRunningTimer();
-    setSpeed(1);
-    setCompressor(0);
-    lcd.setCursor(0,1);
-    lcd.print("Speed: ");
-    lcd.print("1 - No AC");
+  if(fanMode == Auto){
+    fanSpeeds.AutoFanLoop();
+  }
+  else if(fanMode == Low){
+    fanSpeeds.LowFanLoop();
+  }
+  else if(fanMode == Medium){
+    fanSpeeds.MediumFanLoop();
+  }
+  else if(fanMode == High){
+    fanSpeeds.HighFanLoop();
+  }  
+}
 
-  }else if(tempF > 71.0 && tempF < 72.9){
-    //turn fan on
-    startfanRunningTimer();
-    setSpeed(1);
-    setCompressor(1);
-    lcd.setCursor(0,1);
-    lcd.print("Speed: ");
-    lcd.print("1");
-  }
-  else if(tempF > 73.0 && tempF < 74.9){
-    startfanRunningTimer();
-    setSpeed(2);
-    setCompressor(1);
-    lcd.setCursor(0,1);
-    lcd.print("Speed: ");
-    lcd.print("2");
-  }
-  else if(tempF > 75.0){
-    startfanRunningTimer();
-    setSpeed(3);
-    setCompressor(1);
-    lcd.setCursor(0,1);
-    lcd.print("Speed: ");
-    lcd.print("3");
-  }
-  else{
-    //turn everything off
-    setSpeed(0);
-    setCompressor(0);
-    lcd.setCursor(0,1);
-    lcd.print("Speed: ");
-    lcd.print("0");
-  }
-}
-void startfanRunningTimer(){
-  if(!fanRunningTimer.remaining() == 0.0){
-    fanRunningTimer.start(30000);
-  }
-}
-void setCompressor(int val){
-  switch(val){
-    case 0: 
-      if(compressorRunDelay.remaining() == 0.0){
-        digitalWrite(A0,LOW);
-        compressorStartDelay.start(30000);
-      }
-    case 1:
-      if(digitalRead(A0) == LOW && compressorStartDelay.remaining() == 0.0){
-        digitalWrite(A0,HIGH);
-        compressorRunDelay.start(15000);
-      }
-  }
-}
-void setSpeed(int speed){
-  if(speed == 0){
-      if(fanRunningTimer.remaining() == 0.0 && digitalRead(A0) == LOW){
-        fanTimer.restart();
-        digitalWrite(A1, LOW);
-        digitalWrite(A2, LOW);
-        digitalWrite(A3, LOW);
-      }
-  }if(speed == 1){
-    if(fanTimer.remaining() == 0.0){
-      digitalWrite(A1, HIGH);
-      digitalWrite(A2, LOW);
-      digitalWrite(A3, LOW);
-    }
-  }if(speed == 2){
-    if(fanTimer.remaining() == 0.0){
-      digitalWrite(A1, LOW);
-      digitalWrite(A2, HIGH);
-      digitalWrite(A3, LOW);
-    }
-  }if(speed == 3){
-    if(fanTimer.remaining() == 0.0){
-      digitalWrite(A1, LOW);
-      digitalWrite(A2, LOW);
-      digitalWrite(A3, HIGH);
-    }
-  }
-}
